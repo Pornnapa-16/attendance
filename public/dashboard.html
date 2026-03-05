@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการวิชา - ระบบเช็คชื่อ RFID</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar h1 {
+            font-size: 24px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .active-course-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .active-course-text {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .active-course-text small {
+            color: #666;
+            font-weight: 400;
+            margin-left: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .students-section {
+            margin-top: 35px;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .students-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .students-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .students-table th {
+            background: #f8f9fa;
+            color: #333;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid #e8e8e8;
+        }
+
+        .students-table td {
+            padding: 12px;
+            border-bottom: 1px solid #efefef;
+            color: #444;
+        }
+
+        .btn-student-edit {
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .course-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .course-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .course-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .course-code {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .course-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .course-details {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .course-details strong {
+            color: #333;
+        }
+
+        .course-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-view {
+            flex: 1;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-edit {
+            flex: 1;
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-set-active {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .active-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            background: #999;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-submit {
+            flex: 2;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🎓 ระบบเช็คชื่อ RFID</h1>
+        <div class="navbar-right">
+            <span id="teacherName"></span>
+            <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="active-course-panel">
+            <div class="active-course-text" id="activeCourseText">วิชาปัจจุบัน: ยังไม่ได้ตั้งค่า</div>
+            <button class="btn-primary" onclick="loadActiveCourse()">รีเฟรชวิชาปัจจุบัน</button>
+        </div>
+
+        <div class="header-section">
+            <h2>จัดการวิชาเรียน</h2>
+            <button class="btn-primary" onclick="openCreateModal()">+ เพิ่มวิชาใหม่</button>
+        </div>
+
+        <div class="courses-grid" id="coursesGrid">
+            <div class="empty-state">
+                <h3>กำลังโหลด...</h3>
+            </div>
+        </div>
+
+        <div class="students-section">
+            <div class="students-header">
+                <h2>จัดการนักเรียน</h2>
+                <button class="btn-primary" onclick="openStudentModal()">+ เพิ่มนักเรียน</button>
+            </div>
+
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>รหัสนักเรียน</th>
+                        <th>ชื่อ-สกุล</th>
+                        <th>RFID UID</th>
+                        <th>จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsBody">
+                    <tr>
+                        <td colspan="4" class="empty-state">กำลังโหลด...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal สำหรับสร้าง/แก้ไขวิชา -->
+    <div class="modal" id="courseModal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">เพิ่มวิชาใหม่</div>
+            <form id="courseForm">
+                <input type="hidden" id="courseId">
+                
+                <div class="form-group">
+                    <label for="courseCode">รหัสวิชา</label>
+                    <input type="text" id="courseCode" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="courseName">ชื่อวิชา</label>
+                    <input type="text" id="courseName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="classTime">เวลาเข้าเรียน</label>
+                    <input type="time" id="classTime" required>
+                    <small>กำหนดเวลาเริ่มเรียน</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="lateTime">ขีดจำกัดเวลาสาย (นาที)</label>
+                    <input type="number" id="lateTime" min="1" required>
+                    <small>เกินเวลานี้จะถือว่าสาย เช่น 15 นาที</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="absentTime">ขีดจำกัดเวลาขาด (นาที)</label>
+                    <input type="number" id="absentTime" min="1" required>
+                    <small>เกินเวลานี้จะถือว่าขาด เช่น 30 นาที</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal()">ยกเลิก</button>
+                    <button type="submit" class="btn-submit">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal สำหรับเพิ่มนักเรียน -->
+    <div class="modal" id="studentModal">
+        <div class="modal-content">
+            <div class="modal-header" id="studentModalTitle">เพิ่มนักเรียน</div>
+            <form id="studentForm">
+                <input type="hidden" id="studentDbId">
+
+                <div class="form-group">
+                    <label for="studentId">รหัสนักเรียน</label>
+                    <input type="text" id="studentId" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentName">ชื่อ-สกุล</label>
+                    <input type="text" id="studentName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentRfid">RFID UID</label>
+                    <input type="text" id="studentRfid" required>
+                    <small>ตัวอย่าง: 9ef13a02 (ระบบจะบันทึกเป็นตัวพิมพ์เล็ก)</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeStudentModal()">ยกเลิก</button>
+                    <button type="submit" class="btn-submit" id="studentSubmitBtn">บันทึกนักเรียน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let courses = [];
+        let students = [];
+        let activeCourseId = null;
+
+        // ตรวจสอบการล็อกอิน
+        async function checkAuth() {
+            const response = await fetch('/api/session');
+            const data = await response.json();
+            
+            if (!data.loggedIn) {
+                window.location.href = '/';
+                return false;
+            }
+            
+            document.getElementById('teacherName').textContent = `สวัสดี, ${data.teacherName}`;
+            return true;
+        }
+
+        // โหลดรายการวิชา
+        async function loadCourses() {
+            try {
+                const response = await fetch('/api/courses');
+                courses = await response.json();
+                renderCourses();
+            } catch (error) {
+                console.error('Error loading courses:', error);
+            }
+        }
+
+        // โหลดวิชาปัจจุบัน
+        async function loadActiveCourse() {
+            try {
+                const response = await fetch('/api/active-course');
+                const data = await response.json();
+
+                if (response.ok && data.courseId) {
+                    activeCourseId = data.courseId;
+                    document.getElementById('activeCourseText').innerHTML =
+                        `วิชาปัจจุบัน: ${data.courseCode} - ${data.courseName}<small>(บอร์ด ESP32 จะใช้วิชานี้)</small>`;
+                } else {
+                    activeCourseId = null;
+                    document.getElementById('activeCourseText').textContent = 'วิชาปัจจุบัน: ยังไม่ได้ตั้งค่า';
+                }
+
+                renderCourses();
+            } catch (error) {
+                console.error('Error loading active course:', error);
+            }
+        }
+
+        // ตั้งค่าวิชาปัจจุบัน
+        async function setActiveCourse(courseId) {
+            try {
+                const response = await fetch('/api/active-course', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ courseId: courseId })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    activeCourseId = courseId;
+                    await loadActiveCourse();
+                    alert(`ตั้งวิชาปัจจุบันแล้ว: ${result.courseCode} - ${result.courseName}`);
+                } else {
+                    alert(result.error || 'ไม่สามารถตั้งค่าวิชาปัจจุบันได้');
+                }
+            } catch (error) {
+                alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            }
+        }
+
+        // โหลดรายการนักเรียน
+        async function loadStudents() {
+            try {
+                const response = await fetch('/api/students');
+                students = await response.json();
+                renderStudents();
+            } catch (error) {
+                console.error('Error loading students:', error);
+            }
+        }
+
+        // แสดงรายการนักเรียน
+        function renderStudents() {
+            const tbody = document.getElementById('studentsBody');
+
+            if (students.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">ยังไม่มีนักเรียน</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.student_id}</td>
+                    <td>${student.name}</td>
+                    <td>${student.rfid_card}</td>
+                    <td>
+                        <button class="btn-student-edit" onclick="openEditStudentModal(${student.id})">แก้ไข</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // แสดงรายการวิชา
+        function renderCourses() {
+            const grid = document.getElementById('coursesGrid');
+            
+            if (courses.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <h3>ยังไม่มีวิชาเรียน</h3>
+                        <p>คลิกปุ่ม "เพิ่มวิชาใหม่" เพื่อเริ่มต้น</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = courses.map(course => `
+                <div class="course-card">
+                    <div class="course-header">
+                        <div class="course-code">${course.course_code}</div>
+                        <div class="course-name">${course.course_name}</div>
+                        ${activeCourseId === course.id ? '<div class="active-badge">วิชาปัจจุบัน</div>' : ''}
+                    </div>
+                    <div class="course-details">
+                        <div>⏰ <strong>เวลาเรียน:</strong> ${course.class_time} น.</div>
+                        <div>📌 <strong>สายสุด:</strong> ${course.late_time} นาที</div>
+                        <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_time} นาที</div>
+                    </div>
+                    <div class="course-actions">
+                        <button class="btn-set-active" onclick="setActiveCourse(${course.id})">ตั้งเป็นวิชาปัจจุบัน</button>
+                        <button class="btn-view" onclick="viewAttendance(${course.id})">ดูการเช็คชื่อ</button>
+                        <button class="btn-edit" onclick="editCourse(${course.id})">แก้ไข</button>
+                        <button class="btn-delete" onclick="deleteCourse(${course.id})">ลบ</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // เปิด Modal สำหรับสร้างวิชาใหม่
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'เพิ่มวิชาใหม่';
+            document.getElementById('courseForm').reset();
+            document.getElementById('courseId').value = '';
+            document.getElementById('courseModal').style.display = 'flex';
+        }
+
+        // แก้ไขวิชา
+        async function editCourse(id) {
+            const course = courses.find(c => c.id === id);
+            if (!course) return;
+
+            document.getElementById('modalTitle').textContent = 'แก้ไขวิชา';
+            document.getElementById('courseId').value = course.id;
+            document.getElementById('courseCode').value = course.course_code;
+            document.getElementById('courseName').value = course.course_name;
+            document.getElementById('classTime').value = course.class_time;
+            document.getElementById('lateTime').value = course.late_time;
+            document.getElementById('absentTime').value = course.absent_time;
+            document.getElementById('courseModal').style.display = 'flex';
+        }
+
+        // ปิด Modal
+        function closeModal() {
+            document.getElementById('courseModal').style.display = 'none';
+        }
+
+        // เปิด Modal เพิ่มนักเรียน
+        function openStudentModal() {
+            document.getElementById('studentModalTitle').textContent = 'เพิ่มนักเรียน';
+            document.getElementById('studentSubmitBtn').textContent = 'บันทึกนักเรียน';
+            document.getElementById('studentForm').reset();
+            document.getElementById('studentDbId').value = '';
+            document.getElementById('studentModal').style.display = 'flex';
+        }
+
+        // เปิด Modal แก้ไขนักเรียน
+        function openEditStudentModal(id) {
+            const student = students.find(s => s.id === id);
+            if (!student) return;
+
+            document.getElementById('studentModalTitle').textContent = 'แก้ไขนักเรียน';
+            document.getElementById('studentSubmitBtn').textContent = 'บันทึกการแก้ไข';
+            document.getElementById('studentDbId').value = student.id;
+            document.getElementById('studentId').value = student.student_id;
+            document.getElementById('studentName').value = student.name;
+            document.getElementById('studentRfid').value = student.rfid_card;
+            document.getElementById('studentModal').style.display = 'flex';
+        }
+
+        // ปิด Modal เพิ่มนักเรียน
+        function closeStudentModal() {
+            document.getElementById('studentModal').style.display = 'none';
+        }
+
+        // บันทึกวิชา
+        document.getElementById('courseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const courseId = document.getElementById('courseId').value;
+            const data = {
+                course_code: document.getElementById('courseCode').value,
+                course_name: document.getElementById('courseName').value,
+                class_time: document.getElementById('classTime').value,
+                late_time: parseInt(document.getElementById('lateTime').value),
+                absent_time: parseInt(document.getElementById('absentTime').value),
+                active: 1
+            };
+
+            try {
+                const url = courseId ? `/api/courses/${courseId}` : '/api/courses';
+                const method = courseId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    await loadCourses();
+                } else {
+                    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                }
+            } catch (error) {
+                alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            }
+        });
+
+        // บันทึกนักเรียน
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const studentDbId = document.getElementById('studentDbId').value;
+
+            const data = {
+                student_id: document.getElementById('studentId').value.trim(),
+                name: document.getElementById('studentName').value.trim(),
+                rfid_card: document.getElementById('studentRfid').value.trim().toLowerCase()
+            };
+
+            try {
+                const url = studentDbId ? `/api/students/${studentDbId}` : '/api/students';
+                const method = studentDbId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    closeStudentModal();
+                    await loadStudents();
+                } else {
+                    alert(result.error || 'ไม่สามารถเพิ่มนักเรียนได้');
+                }
+            } catch (error) {
+                alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            }
+        });
+
+        // ลบวิชา
+        async function deleteCourse(id) {
+            if (!confirm('คุณต้องการลบวิชานี้หรือไม่?')) return;
+
+            try {
+                const response = await fetch(`/api/courses/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadCourses();
+                } else {
+                    alert('ไม่สามารถลบวิชาได้');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาด');
+            }
+        }
+
+        // ดูการเช็คชื่อ
+        function viewAttendance(courseId) {
+            window.location.href = `/attendance?courseId=${courseId}`;
+        }
+
+        // ออกจากระบบ
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/';
+        }
+
+        // เริ่มต้น
+        checkAuth().then(isAuth => {
+            if (isAuth) {
+                loadCourses();
+                loadStudents();
+                loadActiveCourse();
+            }
+        });
+    </script>
+</body>
+</html>

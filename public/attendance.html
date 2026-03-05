@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เช็คชื่อแบบเรียลไทม์ - ระบบเช็คชื่อ RFID</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar h1 {
+            font-size: 24px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-back {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .course-info {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .course-info h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .course-details {
+            display: flex;
+            gap: 30px;
+            color: #666;
+            flex-wrap: wrap;
+        }
+
+        .course-details div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rfid-scanner {
+            background: white;
+            padding: 20px 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            color: #444;
+            line-height: 1.8;
+        }
+
+        .rfid-scanner h3 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .rfid-scanner p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .scan-result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+
+        .scan-result.late {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+
+        .scan-result.absent {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .scan-result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .result-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .result-icon {
+            font-size: 40px;
+        }
+
+        .attendance-section {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        .stat-item.present {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .stat-item.late {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .stat-item.absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .attendance-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .attendance-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .attendance-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-badge.present {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.late {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-badge.absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .auto-refresh {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🎓 ระบบเช็คชื่อ RFID</h1>
+        <div class="navbar-right">
+            <a href="/dashboard" class="btn-back">← กลับหน้าหลัก</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="course-info">
+            <h2 id="courseName">กำลังโหลด...</h2>
+            <div class="course-details" id="courseDetails"></div>
+        </div>
+
+        <div class="rfid-scanner">
+            <h3>📡 โหมดใช้งานจริง</h3>
+            <p>หน้านี้จะแสดงผลเช็คชื่อจากการสแกนที่บอร์ด ESP32 เท่านั้น และอัปเดตอัตโนมัติทุก 5 วินาที</p>
+        </div>
+
+        <div class="attendance-section">
+            <div class="section-header">
+                <h3>📋 รายการเช็คชื่อวันนี้</h3>
+                <div class="auto-refresh">🔄 อัปเดตอัตโนมัติทุก 5 วินาที</div>
+            </div>
+
+            <div class="stats" id="stats">
+                <div class="stat-item present">
+                    <div class="stat-number" id="presentCount">0</div>
+                    <div class="stat-label">มา</div>
+                </div>
+                <div class="stat-item late">
+                    <div class="stat-number" id="lateCount">0</div>
+                    <div class="stat-label">สาย</div>
+                </div>
+                <div class="stat-item absent">
+                    <div class="stat-number" id="absentCount">0</div>
+                    <div class="stat-label">ขาด</div>
+                </div>
+            </div>
+
+            <table class="attendance-table" id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>รหัสนักเรียน</th>
+                        <th>ชื่อ-สกุล</th>
+                        <th>เวลาเช็คชื่อ</th>
+                        <th>สถานะ</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                    <tr>
+                        <td colspan="4" class="empty-state">ยังไม่มีการเช็คชื่อ</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let courseId = null;
+        let course = null;
+
+        // ดึง courseId จาก URL
+        const urlParams = new URLSearchParams(window.location.search);
+        courseId = urlParams.get('courseId');
+
+        if (!courseId) {
+            alert('ไม่พบข้อมูลวิชา');
+            window.location.href = '/dashboard';
+        }
+
+        // โหลดข้อมูลวิชา
+        async function loadCourse() {
+            try {
+                const response = await fetch(`/api/courses/${courseId}`);
+                course = await response.json();
+                
+                document.getElementById('courseName').textContent = course.course_name;
+                document.getElementById('courseDetails').innerHTML = `
+                    <div>📚 <strong>รหัสวิชา:</strong> ${course.course_code}</div>
+                    <div>⏰ <strong>เวลาเรียน:</strong> ${course.class_time} น.</div>
+                    <div>📌 <strong>สายสุด:</strong> ${course.late_time} นาที</div>
+                    <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_time} นาที</div>
+                `;
+            } catch (error) {
+                console.error('Error loading course:', error);
+            }
+        }
+
+        // โหลดรายการเช็คชื่อ
+        async function loadAttendance() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(`/api/attendance/${courseId}?date=${today}`);
+                const records = await response.json();
+
+                updateStats(records);
+                renderAttendanceTable(records);
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+
+        // อัปเดตสถิติ
+        function updateStats(records) {
+            const presentCount = records.filter(r => r.status === 'มา').length;
+            const lateCount = records.filter(r => r.status === 'สาย' || r.status === 'สายมาก').length;
+            const absentCount = records.filter(r => r.status === 'ขาด').length;
+
+            document.getElementById('presentCount').textContent = presentCount;
+            document.getElementById('lateCount').textContent = lateCount;
+            document.getElementById('absentCount').textContent = absentCount;
+        }
+
+        // แสดงตารางเช็คชื่อ
+        function renderAttendanceTable(records) {
+            const tbody = document.getElementById('attendanceBody');
+
+            if (records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">ยังไม่มีการเช็คชื่อ</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = records.map(record => {
+                const time = new Date(record.scan_time).toLocaleTimeString('th-TH');
+                const statusClass = record.status === 'มา' ? 'present' : 
+                                   record.status === 'สาย' || record.status === 'สายมาก' ? 'late' : 
+                                   'absent';
+                
+                return `
+                    <tr>
+                        <td>${record.student_id}</td>
+                        <td>${record.name}</td>
+                        <td>${time}</td>
+                        <td><span class="status-badge ${statusClass}">${record.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // โหลดข้อมูลเริ่มต้น
+        loadCourse();
+        loadAttendance();
+
+        // อัปเดตอัตโนมัติทุก 5 วินาที
+        setInterval(loadAttendance, 5000);
+    </script>
+</body>
+</html>
