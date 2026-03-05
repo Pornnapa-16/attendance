@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Koyeb Renderfile - Build and Deploy Node.js Server
+# https://koyeb.com
+
+# Build Phase
+npm install
+
+# Start Phase
+npm start
