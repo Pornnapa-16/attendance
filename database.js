@@ -3,7 +3,6 @@ const { Pool } = require('pg');
 
 // สร้าง connection pool
 let pool;
-const isProduction = process.env.NODE_ENV === 'production';
 const connectionString = process.env.DATABASE_URL;
 
 if (connectionString) {
@@ -13,11 +12,11 @@ if (connectionString) {
         ssl: { rejectUnauthorized: false }
     });
     console.log('✅ Database mode: DATABASE_URL');
-} else if (isProduction) {
-    // ป้องกัน fallback ไป localhost บน cloud ที่ทำให้ดีบั๊กยาก
-    throw new Error('DATABASE_URL is required in production (Render > Environment)');
 } else {
     // ใช้ individual credentials (สำหรับ local development)
+    if (process.env.NODE_ENV === 'production') {
+        console.warn('⚠️ DATABASE_URL is missing in production. Falling back to DB_* / localhost settings.');
+    }
     pool = new Pool({
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
