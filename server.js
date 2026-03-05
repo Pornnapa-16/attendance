@@ -9,10 +9,10 @@ const { pool, initDatabase } = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// เริ่มต้นฐานข้อมูล
+// เริ่มต้นฐานข้อมูล (ไม่ block startup)
 initDatabase().catch(err => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
+    console.warn('Database initialization warning:', err.message);
+    console.warn('Server will start anyway, but features may not work until DB is ready');
 });
 
 // Middleware
