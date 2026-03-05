@@ -1,9 +1,9 @@
 require('dotenv').config();
 const { pool, initDatabase } = require('./database');
 
-async function setupDatabase() {
+async function setup() {
     try {
-        console.log('🔄 กำลังเชื่อมต่อไปยัง Railway Database...\n');
+        console.log('🔄 กำลังเชื่อมต่อไปยัง Supabase Database...\n');
         
         // Test connection
         const client = await pool.connect();
@@ -28,22 +28,24 @@ async function setupDatabase() {
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
+            AND table_type = 'BASE TABLE'
             ORDER BY table_name
         `);
         
-        console.log('✅ ตรวจสอบแล้ว: พบตารางทั้งหมด', result.rows.length, 'ตาราง\n');
+        console.log('✅ ตรวจสอบแล้ว: พบตารางทั้งสิ้น', result.rows.length, 'ตาราง\n');
         result.rows.forEach(row => {
             console.log('   ✓', row.table_name);
         });
 
+        console.log('\n✅ พร้อมใช้งาน! ตอนนี้รัน: node add_data.js\n');
         process.exit(0);
     } catch (err) {
         console.error('\n❌ เกิดข้อผิดพลาด:', err.message);
         console.error('\n💡 ตรวจสอบ:');
         console.error('   1. DATABASE_URL ใน .env ถูกต้องหรือไม่');
-        console.error('   2. Railway database ทำงานอยู่หรือไม่\n');
+        console.error('   2. Supabase database ทำงานอยู่หรือไม่\n');
         process.exit(1);
     }
 }
 
-setupDatabase();
+setup();

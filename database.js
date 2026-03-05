@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 let pool;
 
 if (process.env.DATABASE_URL) {
-    // ใช้ CONNECTION STRING (สำหรับ Railway, Heroku, etc)
+    // ใช้ CONNECTION STRING (สำหรับ Koyeb, Railway, Heroku, Supabase)
     pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
@@ -23,99 +23,92 @@ if (process.env.DATABASE_URL) {
 
 // Test connection
 pool.on('error', (err) => {
-    console.error('Unexpected error on idle client', err);
+    console.error('❌ Unexpected error on idle client', err);
 });
 
 // สร้างตารางในฐานข้อมูล
 async function initDatabase() {
     try {
-        const client = await pool.connect();
-
-        // ตารางอาจารย์
-        await client.query(`
+        // 1. Create teachers table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS teachers (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(255) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
-                name VARCHAR(255) NOT NULL,
+                name VARCHAR(255),
                 email VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // ตารางวิชา
-        await client.query(`
+        // 2. Create courses table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
-                teacher_id INTEGER NOT NULL,
-                course_code VARCHAR(255),
-                name VARCHAR(255) NOT NULL,
+                teacher_id INTEGER REFERENCES teachers(id) ON DELETE CASCADE,
+                course_code VARCHAR(50) UNIQUE,
+                name VARCHAR(255),
                 start_time VARCHAR(5),
                 end_time VARCHAR(5),
-                late_threshold INTEGER DEFAULT 5,
-                absent_threshold INTEGER DEFAULT 15,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+                late_threshold INTEGER DEFAULT 10,
+                absent_threshold INTEGER DEFAULT 3,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // ตารางนักเรียน
-        await client.query(`
+        // 3. Create students table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS students (
                 id SERIAL PRIMARY KEY,
-                course_id INTEGER NOT NULL,
-                student_id VARCHAR(255) NOT NULL,
-                name VARCHAR(255) NOT NULL,
-                rfid_card VARCHAR(255) NOT NULL,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                student_id VARCHAR(50),
+                name VARCHAR(255),
+                rfid_card VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (course_id) REFERENCES courses(id),
                 UNIQUE(course_id, student_id)
             )
         `);
 
-        // ตารางการลงทะเบียนเรียน
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS course_enrollments (
-                id SERIAL PRIMARY KEY,
-                course_id INTEGER NOT NULL,
-                student_id INTEGER NOT NULL,
-                enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (course_id) REFERENCES courses(id),
-                FOREIGN KEY (student_id) REFERENCES students(id),
-                UNIQUE(course_id, student_id)
-            )
-        `);
-
-        // ตารางบันทึกการเข้าเรียน
-        await client.query(`
+        // 4. Create attendance table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS attendance (
                 id SERIAL PRIMARY KEY,
-                course_id INTEGER NOT NULL,
-                student_id INTEGER NOT NULL,
-                scan_date DATE NOT NULL,
-                scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+                scan_date DATE,
+                scan_time TIMESTAMP,
                 status VARCHAR(50),
-                FOREIGN KEY (course_id) REFERENCES courses(id),
-                FOREIGN KEY (student_id) REFERENCES students(id)
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // ตารางการตั้งค่าแอป
-        await client.query(`
+        // 5. Create course_enrollments table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS course_enrollments (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+                enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(course_id, student_id)
+            )
+        `);
+
+        // 6. Create app_settings table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS app_settings (
                 id SERIAL PRIMARY KEY,
-                key VARCHAR(255) UNIQUE NOT NULL,
+                key VARCHAR(255) UNIQUE,
                 value TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        client.release();
-        console.log('✓ ฐานข้อมูล PostgreSQL พร้อมใช้งาน');
+        console.log('✅ สร้างตารางทั้งหมดเสร็จสิ้น!');
+        return true;
     } catch (err) {
-        console.error('❌ เกิดข้อผิดพลาดในการตั้ง Database:', err);
-        process.exit(1);
+        console.error('❌ Error creating tables:', err.message);
+        throw err;
     }
 }
 
