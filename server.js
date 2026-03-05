@@ -530,6 +530,70 @@ app.put('/api/students/:id', requireAuth, async (req, res) => {
     }
 });
 
+// นำเข้านักเรียนจากไฟล์ (Bulk import)
+app.post('/api/students/bulk', requireAuth, async (req, res) => {
+    try {
+        const { students } = req.body;
+
+        if (!Array.isArray(students) || students.length === 0) {
+            return res.status(400).json({ error: 'ข้อมูลไม่ถูกต้อง' });
+        }
+
+        let imported = 0;
+        let errors = 0;
+
+        for (const student of students) {
+            try {
+                const { course_id, student_id, rfid_card, name } = student;
+
+                if (!course_id || !student_id || !rfid_card || !name) {
+                    errors++;
+                    continue;
+                }
+
+                const normalizedStudentId = String(student_id).trim();
+                const normalizedName = String(name).trim();
+                const normalizedRfid = String(rfid_card).trim().toLowerCase();
+
+                // Check if student already exists
+                const existingStudent = await pool.query(
+                    'SELECT id FROM students WHERE course_id = $1 AND student_id = $2',
+                    [course_id, normalizedStudentId]
+                );
+
+                if (existingStudent.rows.length > 0) {
+                    // Update existing student
+                    await pool.query(
+                        'UPDATE students SET rfid_card = $1, name = $2 WHERE id = $3',
+                        [normalizedRfid, normalizedName, existingStudent.rows[0].id]
+                    );
+                } else {
+                    // Insert new student
+                    await pool.query(
+                        'INSERT INTO students (course_id, student_id, rfid_card, name) VALUES ($1, $2, $3, $4)',
+                        [course_id, normalizedStudentId, normalizedRfid, normalizedName]
+                    );
+                }
+
+                imported++;
+            } catch (err) {
+                console.error('Error importing student:', err);
+                errors++;
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            imported: imported,
+            errors: errors,
+            message: `นำเข้า ${imported} นักเรียน${errors > 0 ? `, มีข้อผิดพลาด ${errors} รายการ` : ''}`
+        });
+    } catch (err) {
+        console.error('Bulk import error:', err);
+        res.status(500).json({ error: 'เกิดข้อผิดพลาดในการนำเข้า' });
+    }
+});
+
 // ==================== เสิร์ฟหน้าเว็บ ====================
 
 app.get('/', (req, res) => {

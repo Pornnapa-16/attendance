@@ -308,6 +308,21 @@
             border-color: #667eea;
         }
 
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .form-group small {
             display: block;
             margin-top: 5px;
@@ -385,7 +400,11 @@
         <div class="students-section">
             <div class="students-header">
                 <h2>จัดการนักเรียน</h2>
-                <button class="btn-primary" onclick="openStudentModal()">+ เพิ่มนักเรียน</button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" onclick="openStudentModal()">+ เพิ่มนักเรียน</button>
+                    <button class="btn-primary" onclick="document.getElementById('csvFileInput').click()">📥 นำเข้าจากไฟล์</button>
+                    <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
+                </div>
             </div>
 
             <table class="students-table">
@@ -457,6 +476,13 @@
                 <input type="hidden" id="studentDbId">
 
                 <div class="form-group">
+                    <label for="studentCourse">วิชา</label>
+                    <select id="studentCourse" required>
+                        <option value="">-- เลือกวิชา --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="studentId">รหัสนักเรียน</label>
                     <input type="text" id="studentId" required>
                 </div>
@@ -519,7 +545,7 @@
                 if (response.ok && data.courseId) {
                     activeCourseId = data.courseId;
                     document.getElementById('activeCourseText').innerHTML =
-                        `วิชาปัจจุบัน: ${data.courseCode} - ${data.courseName}<small>(บอร์ด ESP32 จะใช้วิชานี้)</small>`;
+                        `วิชาปัจจุบัน: ${data.courseName}<small>(บอร์ด ESP32 จะใช้วิชานี้)</small>`;
                 } else {
                     activeCourseId = null;
                     document.getElementById('activeCourseText').textContent = 'วิชาปัจจุบัน: ยังไม่ได้ตั้งค่า';
@@ -544,7 +570,7 @@
                 if (response.ok) {
                     activeCourseId = courseId;
                     await loadActiveCourse();
-                    alert(`ตั้งวิชาปัจจุบันแล้ว: ${result.courseCode} - ${result.courseName}`);
+                    alert(`ตั้งวิชาปัจจุบันแล้ว: ${result.courseName}`);
                 } else {
                     alert(result.error || 'ไม่สามารถตั้งค่าวิชาปัจจุบันได้');
                 }
@@ -602,14 +628,14 @@
             grid.innerHTML = courses.map(course => `
                 <div class="course-card">
                     <div class="course-header">
-                        <div class="course-code">${course.course_code}</div>
-                        <div class="course-name">${course.course_name}</div>
+                        <div class="course-code">${course.course_code || 'N/A'}</div>
+                        <div class="course-name">${course.name}</div>
                         ${activeCourseId === course.id ? '<div class="active-badge">วิชาปัจจุบัน</div>' : ''}
                     </div>
                     <div class="course-details">
-                        <div>⏰ <strong>เวลาเรียน:</strong> ${course.class_time} น.</div>
-                        <div>📌 <strong>สายสุด:</strong> ${course.late_time} นาที</div>
-                        <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_time} นาที</div>
+                        <div>⏰ <strong>เวลาเรียน:</strong> ${course.start_time} น.</div>
+                        <div>📌 <strong>สายสุด:</strong> ${course.late_threshold} นาที</div>
+                        <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_threshold} นาที</div>
                     </div>
                     <div class="course-actions">
                         <button class="btn-set-active" onclick="setActiveCourse(${course.id})">ตั้งเป็นวิชาปัจจุบัน</button>
@@ -636,11 +662,11 @@
 
             document.getElementById('modalTitle').textContent = 'แก้ไขวิชา';
             document.getElementById('courseId').value = course.id;
-            document.getElementById('courseCode').value = course.course_code;
-            document.getElementById('courseName').value = course.course_name;
-            document.getElementById('classTime').value = course.class_time;
-            document.getElementById('lateTime').value = course.late_time;
-            document.getElementById('absentTime').value = course.absent_time;
+            document.getElementById('courseCode').value = course.course_code || '';
+            document.getElementById('courseName').value = course.name;
+            document.getElementById('classTime').value = course.start_time;
+            document.getElementById('lateTime').value = course.late_threshold;
+            document.getElementById('absentTime').value = course.absent_threshold;
             document.getElementById('courseModal').style.display = 'flex';
         }
 
@@ -655,6 +681,17 @@
             document.getElementById('studentSubmitBtn').textContent = 'บันทึกนักเรียน';
             document.getElementById('studentForm').reset();
             document.getElementById('studentDbId').value = '';
+            
+            // ส่งตัวเลือกวิชา
+            const courseSelect = document.getElementById('studentCourse');
+            courseSelect.innerHTML = '<option value="">-- เลือกวิชา --</option>';
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = course.course_name || course.name;
+                courseSelect.appendChild(option);
+            });
+            
             document.getElementById('studentModal').style.display = 'flex';
         }
 
@@ -666,6 +703,20 @@
             document.getElementById('studentModalTitle').textContent = 'แก้ไขนักเรียน';
             document.getElementById('studentSubmitBtn').textContent = 'บันทึกการแก้ไข';
             document.getElementById('studentDbId').value = student.id;
+            
+            // ส่งตัวเลือกวิชา
+            const courseSelect = document.getElementById('studentCourse');
+            courseSelect.innerHTML = '<option value="">-- เลือกวิชา --</option>';
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = course.course_name || course.name;
+                if (course.id === student.course_id) {
+                    option.selected = true;
+                }
+                courseSelect.appendChild(option);
+            });
+            
             document.getElementById('studentId').value = student.student_id;
             document.getElementById('studentName').value = student.name;
             document.getElementById('studentRfid').value = student.rfid_card;
@@ -682,13 +733,13 @@
             e.preventDefault();
 
             const courseId = document.getElementById('courseId').value;
+            const startTime = document.getElementById('classTime').value;
             const data = {
-                course_code: document.getElementById('courseCode').value,
-                course_name: document.getElementById('courseName').value,
-                class_time: document.getElementById('classTime').value,
-                late_time: parseInt(document.getElementById('lateTime').value),
-                absent_time: parseInt(document.getElementById('absentTime').value),
-                active: 1
+                name: document.getElementById('courseName').value,
+                start_time: startTime,
+                end_time: startTime,
+                late_threshold: parseInt(document.getElementById('lateTime').value),
+                absent_threshold: parseInt(document.getElementById('absentTime').value)
             };
 
             try {
@@ -701,11 +752,12 @@
                     body: JSON.stringify(data)
                 });
 
+                const result = await response.json();
                 if (response.ok) {
                     closeModal();
                     await loadCourses();
                 } else {
-                    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                    alert(result.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
                 }
             } catch (error) {
                 alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
@@ -717,8 +769,15 @@
             e.preventDefault();
 
             const studentDbId = document.getElementById('studentDbId').value;
+            const courseId = document.getElementById('studentCourse').value;
+
+            if (!courseId) {
+                alert('กรุณาเลือกวิชา');
+                return;
+            }
 
             const data = {
+                course_id: parseInt(courseId),
                 student_id: document.getElementById('studentId').value.trim(),
                 name: document.getElementById('studentName').value.trim(),
                 rfid_card: document.getElementById('studentRfid').value.trim().toLowerCase()
@@ -763,6 +822,81 @@
             } catch (error) {
                 alert('เกิดข้อผิดพลาด');
             }
+        }
+
+        // จัดการนำเข้าไฟล์ CSV
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const csv = e.target.result;
+                    const lines = csv.split('\n').filter(line => line.trim());
+                    
+                    if (lines.length < 2) {
+                        alert('ไฟล์ต้องมีหัวข้อและอย่างน้อย 1 แถว');
+                        return;
+                    }
+
+                    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    const courseIdIdx = header.indexOf('course_id') || header.indexOf('วิชา') || 0;
+                    const studentIdIdx = header.indexOf('student_id') || header.indexOf('รหัสนักเรียน') || 0;
+                    const nameIdx = header.indexOf('name') || header.indexOf('ชื่อ') || 1;
+                    const rfidIdx = header.indexOf('rfid') || header.indexOf('rfid_card') || header.indexOf('rfid uid') || 2;
+
+                    const students = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const parts = lines[i].split(',').map(p => p.trim());
+                        if (parts[0]) {
+                            students.push({
+                                course_id: parseInt(parts[courseIdIdx]) || activeCourseId,
+                                student_id: parts[studentIdIdx],
+                                name: parts[nameIdx],
+                                rfid_card: parts[rfidIdx] ? parts[rfidIdx].toLowerCase() : ''
+                            });
+                        }
+                    }
+
+                    if (students.length === 0) {
+                        alert('ไม่มีข้อมูลนักเรียนในไฟล์');
+                        return;
+                    }
+
+                    // ตรวจสอบว่าเลือกวิชาแล้ว
+                    if (!students[0].course_id) {
+                        alert('กรุณาตั้งค่าวิชาปัจจุบันหรือระบุ course_id ในไฟล์')
+                        return;
+                    }
+
+                    const summary = `พบ ${students.length} นักเรียน\n\nนักเรียนแรก:\n- รหัส: ${students[0].student_id}\n- ชื่อ: ${students[0].name}\n- RFID: ${students[0].rfid_card}\n\nต้องการนำเข้าข้อมูลนี้ใช่หรือไม่?`;
+                    
+                    if (!confirm(summary)) {
+                        return;
+                    }
+
+                    const response = await fetch('/api/students/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ students })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        alert(`นำเข้าสำเร็จ: ${result.imported} นักเรียน\nข้อผิดพลาด: ${result.errors || 0}`);
+                        await loadStudents();
+                    } else {
+                        alert(result.error || 'เกิดข้อผิดพลาดในการนำเข้า');
+                    }
+                } catch (error) {
+                    alert('ไม่สามารถอ่านไฟล์ได้: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset input
+            event.target.value = '';
         }
 
         // ดูการเช็คชื่อ
