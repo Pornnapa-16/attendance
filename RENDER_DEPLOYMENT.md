@@ -50,7 +50,7 @@
 
 3. รันคำสั่งใน PowerShell:
    ```powershell
-   node setup_railway_db.js
+   node init_database.js
    ```
    
 4. ถ้าสำเร็จจะเห็น:
@@ -201,7 +201,7 @@ psql -U attendance_user attendance_db < backup.sql
 ### **ปัญหา: Deploy สำเร็จแต่เว็บเปิดไม่ได้**
 ✅ **แก้ไข:**
 - ตรวจสอบว่าเพิ่ม `DATABASE_URL` ใน Environment Variables แล้ว
-- ตรวจสอบว่าตารางถูกสร้างในฐานข้อมูลแล้ว (รัน `setup_railway_db.js`)
+- ตรวจสอบว่าตารางถูกสร้างในฐานข้อมูลแล้ว (รัน `init_database.js`)
 
 ### **ปัญหา: Login ไม่ได้**
 ✅ **แก้ไข:**
