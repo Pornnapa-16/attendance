@@ -1,0 +1,13 @@
+services:
+  # Web Service (Node.js) - ฟรีตลอดชีพ
+  - type: web
+    name: attendance-system
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/session
+    # หมายเหตุ: DATABASE_URL ต้องเพิ่มเองใน Dashboard หลังสร้าง PostgreSQL
