@@ -336,12 +336,12 @@
                 const response = await fetch(`/api/courses/${courseId}`);
                 course = await response.json();
                 
-                document.getElementById('courseName').textContent = course.course_name;
+                document.getElementById('courseName').textContent = course.name;
                 document.getElementById('courseDetails').innerHTML = `
-                    <div>📚 <strong>รหัสวิชา:</strong> ${course.course_code}</div>
-                    <div>⏰ <strong>เวลาเรียน:</strong> ${course.class_time} น.</div>
-                    <div>📌 <strong>สายสุด:</strong> ${course.late_time} นาที</div>
-                    <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_time} นาที</div>
+                    <div>📚 <strong>รหัสวิชา:</strong> ${course.course_code || 'N/A'}</div>
+                    <div>⏰ <strong>เวลาเรียน:</strong> ${course.start_time} น.</div>
+                    <div>📌 <strong>สายสุด:</strong> ${course.late_threshold} นาที</div>
+                    <div>❌ <strong>ขาดเมื่อเกิน:</strong> ${course.absent_threshold} นาที</div>
                 `;
             } catch (error) {
                 console.error('Error loading course:', error);

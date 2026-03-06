@@ -66,12 +66,19 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS students (
                 id SERIAL PRIMARY KEY,
                 course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                student_number INTEGER,
                 student_id VARCHAR(50),
                 name VARCHAR(255),
                 rfid_card VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(course_id, student_id)
             )
+        `);
+
+        // รองรับฐานข้อมูลเดิมที่ยังไม่มีคอลัมน์เลขที่
+        await pool.query(`
+            ALTER TABLE students
+            ADD COLUMN IF NOT EXISTS student_number INTEGER
         `);
 
         // 4. Create attendance table

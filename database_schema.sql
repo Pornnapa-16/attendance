@@ -30,12 +30,17 @@ CREATE TABLE IF NOT EXISTS courses (
 CREATE TABLE IF NOT EXISTS students (
     id SERIAL PRIMARY KEY,
     course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    student_number INTEGER,
     student_id VARCHAR(50),
     name VARCHAR(255),
     rfid_card VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(course_id, student_id)
 );
+
+-- Migration for existing databases
+ALTER TABLE students
+ADD COLUMN IF NOT EXISTS student_number INTEGER;
 
 -- 4. Attendance Table
 CREATE TABLE IF NOT EXISTS attendance (

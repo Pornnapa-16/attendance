@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการวิชา - ระบบเช็คชื่อ RFID</title>
+    <!-- SheetJS library สำหรับอ่านไฟล์ Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -151,6 +153,20 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 13px;
+        }
+
+        .btn-student-delete {
+            background: #F44336;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-student-delete:hover {
+            background: #D32F2F;
         }
 
         .course-card {
@@ -376,6 +392,7 @@
         <h1>🎓 ระบบเช็คชื่อ RFID</h1>
         <div class="navbar-right">
             <span id="teacherName"></span>
+            <button class="btn-logout" onclick="window.location.href='/profile'" style="background: white; color: #667eea; margin-right: 10px;">โปรไฟล์</button>
             <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
         </div>
     </div>
@@ -399,26 +416,36 @@
 
         <div class="students-section">
             <div class="students-header">
-                <h2>จัดการนักเรียน</h2>
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <h2 style="margin: 0;">จัดการนักเรียน</h2>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="courseSelect" style="font-weight: bold;">เลือกวิชา:</label>
+                        <select id="courseSelect" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; cursor: pointer;" onchange="changeCourse()">
+                            <option value="">-- เลือกวิชา --</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-primary" onclick="openStudentModal()">+ เพิ่มนักเรียน</button>
                     <button class="btn-primary" onclick="document.getElementById('csvFileInput').click()">📥 นำเข้าจากไฟล์</button>
-                    <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
+                    <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display: none;" onchange="handleFileUpload(event)">
                 </div>
             </div>
 
             <table class="students-table">
                 <thead>
                     <tr>
+                        <th>เลขที่</th>
                         <th>รหัสนักเรียน</th>
                         <th>ชื่อ-สกุล</th>
                         <th>RFID UID</th>
-                        <th>จัดการ</th>
+                        <th>แก้ไข</th>
+                        <th>ลบ</th>
                     </tr>
                 </thead>
                 <tbody id="studentsBody">
                     <tr>
-                        <td colspan="4" class="empty-state">กำลังโหลด...</td>
+                        <td colspan="6" class="empty-state">กำลังโหลด...</td>
                     </tr>
                 </tbody>
             </table>
@@ -480,6 +507,11 @@
                     <select id="studentCourse" required>
                         <option value="">-- เลือกวิชา --</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentNumber">เลขที่</label>
+                    <input type="number" id="studentNumber" min="1" placeholder="เช่น 1">
                 </div>
 
                 <div class="form-group">
@@ -570,7 +602,8 @@
                 if (response.ok) {
                     activeCourseId = courseId;
                     await loadActiveCourse();
-                    alert(`ตั้งวิชาปัจจุบันแล้ว: ${result.courseName}`);
+                    await loadStudents(); // โหลดนักเรียนของวิชาใหม่
+                    alert(`ตั้งวิชาปัจจุบันแล้ว: ${result.courseName}\n\n🔄 รายชื่อนักเรียนอัพเดทแล้ว`);
                 } else {
                     alert(result.error || 'ไม่สามารถตั้งค่าวิชาปัจจุบันได้');
                 }
@@ -579,10 +612,30 @@
             }
         }
 
-        // โหลดรายการนักเรียน
+        // เปลี่ยนวิชาผ่าน dropdown (ไม่บันทึกเป็น active-course ในเซิร์ฟเวอร์)
+        function changeCourse() {
+            const courseSelect = document.getElementById('courseSelect');
+            const selectedCourseId = parseInt(courseSelect.value, 10);
+
+            if (!selectedCourseId) {
+                activeCourseId = null;
+                renderStudents();
+                return;
+            }
+
+            activeCourseId = selectedCourseId;
+            loadStudents();
+        }
+
+        // โหลดรายการนักเรียน (ตาม course ที่เลือก)
         async function loadStudents() {
             try {
-                const response = await fetch('/api/students');
+                // ถ้ามีวิชาปัจจุบัน ให้โหลดเฉพาะนักเรียนของวิชานั้น
+                const url = activeCourseId 
+                    ? `/api/students?courseId=${activeCourseId}` 
+                    : '/api/students';
+                    
+                const response = await fetch(url);
                 students = await response.json();
                 renderStudents();
             } catch (error) {
@@ -595,17 +648,24 @@
             const tbody = document.getElementById('studentsBody');
 
             if (students.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">ยังไม่มีนักเรียน</td></tr>';
+                const message = activeCourseId 
+                    ? 'ยังไม่มีนักเรียนในวิชานี้' 
+                    : 'กรุณาตั้งค่าวิชาปัจจุบันเพื่อดูรายชื่อนักเรียน';
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${message}</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = students.map(student => `
                 <tr>
+                    <td>${student.student_number ?? '-'}</td>
                     <td>${student.student_id}</td>
                     <td>${student.name}</td>
                     <td>${student.rfid_card}</td>
                     <td>
                         <button class="btn-student-edit" onclick="openEditStudentModal(${student.id})">แก้ไข</button>
+                    </td>
+                    <td>
+                        <button class="btn-student-delete" onclick="deleteStudent(${student.id}, '${student.name}')">ลบ</button>
                     </td>
                 </tr>
             `).join('');
@@ -614,6 +674,23 @@
         // แสดงรายการวิชา
         function renderCourses() {
             const grid = document.getElementById('coursesGrid');
+            
+            // เติมข้อมูลใน dropdown เลือกวิชา
+            const courseSelect = document.getElementById('courseSelect');
+            if (courseSelect) {
+                const selectedCourseId = courseSelect.value;
+                courseSelect.innerHTML = '<option value="">-- เลือกวิชา --</option>';
+                
+                courses.forEach(course => {
+                    const option = document.createElement('option');
+                    option.value = course.id;
+                    option.textContent = `${course.course_code || ''} - ${course.name}`;
+                    if (course.id == selectedCourseId || course.id === activeCourseId) {
+                        option.selected = true;
+                    }
+                    courseSelect.appendChild(option);
+                });
+            }
             
             if (courses.length === 0) {
                 grid.innerHTML = `
@@ -688,7 +765,7 @@
             courses.forEach(course => {
                 const option = document.createElement('option');
                 option.value = course.id;
-                option.textContent = course.course_name || course.name;
+                option.textContent = course.name;
                 courseSelect.appendChild(option);
             });
             
@@ -710,13 +787,14 @@
             courses.forEach(course => {
                 const option = document.createElement('option');
                 option.value = course.id;
-                option.textContent = course.course_name || course.name;
+                option.textContent = course.name;
                 if (course.id === student.course_id) {
                     option.selected = true;
                 }
                 courseSelect.appendChild(option);
             });
             
+            document.getElementById('studentNumber').value = student.student_number ?? '';
             document.getElementById('studentId').value = student.student_id;
             document.getElementById('studentName').value = student.name;
             document.getElementById('studentRfid').value = student.rfid_card;
@@ -728,6 +806,31 @@
             document.getElementById('studentModal').style.display = 'none';
         }
 
+        // ลบนักเรียน
+        async function deleteStudent(id, name) {
+            if (!confirm(`ต้องการลบ ${name} ใช่หรือไม่?\n\nข้อมูลเช็คชื่อของนักเรียนคนนี้จะถูกลบด้วย`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/students/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert('❌ ' + (data.error || 'ไม่สามารถลบนักเรียนได้'));
+                    return;
+                }
+
+                alert('✅ ลบนักเรียนสำเร็จ');
+                loadStudents();
+            } catch (err) {
+                console.error('Delete error:', err);
+                alert('❌ เกิดข้อผิดพลาด: ' + err.message);
+            }
+        }
+
         // บันทึกวิชา
         document.getElementById('courseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -735,6 +838,7 @@
             const courseId = document.getElementById('courseId').value;
             const startTime = document.getElementById('classTime').value;
             const data = {
+                course_code: document.getElementById('courseCode').value.trim(),
                 name: document.getElementById('courseName').value,
                 start_time: startTime,
                 end_time: startTime,
@@ -776,8 +880,10 @@
                 return;
             }
 
+            const studentNumberRaw = document.getElementById('studentNumber').value.trim();
             const data = {
                 course_id: parseInt(courseId),
+                student_number: studentNumberRaw ? parseInt(studentNumberRaw, 10) : null,
                 student_id: document.getElementById('studentId').value.trim(),
                 name: document.getElementById('studentName').value.trim(),
                 rfid_card: document.getElementById('studentRfid').value.trim().toLowerCase()
@@ -824,76 +930,241 @@
             }
         }
 
-        // จัดการนำเข้าไฟล์ CSV
+        // อ่านไฟล์ Excel และแปลงเป็น CSV
+        async function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        // อ่าน sheet แรก
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        
+                        // แปลงเป็น CSV
+                        const csv = XLSX.utils.sheet_to_csv(firstSheet);
+                        resolve(csv);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // จัดการนำเข้าไฟล์ CSV และ Excel - รองรับหลาย encoding
         async function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const csv = e.target.result;
-                    const lines = csv.split('\n').filter(line => line.trim());
-                    
-                    if (lines.length < 2) {
-                        alert('ไฟล์ต้องมีหัวข้อและอย่างน้อย 1 แถว');
-                        return;
-                    }
+            // ตรวจสอบว่าตั้งค่าวิชาปัจจุบันแล้วหรือไม่
+            if (!activeCourseId) {
+                alert('กรุณาตั้งค่าวิชาปัจจุบันก่อนนำเข้าข้อมูล\n\nคลิกปุ่ม "ตั้งเป็นวิชาปัจจุบัน" ที่การ์ดวิชาก่อน');
+                event.target.value = '';
+                return;
+            }
 
-                    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
-                    const courseIdIdx = header.indexOf('course_id') || header.indexOf('วิชา') || 0;
-                    const studentIdIdx = header.indexOf('student_id') || header.indexOf('รหัสนักเรียน') || 0;
-                    const nameIdx = header.indexOf('name') || header.indexOf('ชื่อ') || 1;
-                    const rfidIdx = header.indexOf('rfid') || header.indexOf('rfid_card') || header.indexOf('rfid uid') || 2;
+            // ตรวจสอบนามสกุลไฟล์
+            const fileName = file.name.toLowerCase();
+            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+            const isCSV = fileName.endsWith('.csv');
 
-                    const students = [];
-                    for (let i = 1; i < lines.length; i++) {
-                        const parts = lines[i].split(',').map(p => p.trim());
-                        if (parts[0]) {
-                            students.push({
-                                course_id: parseInt(parts[courseIdIdx]) || activeCourseId,
-                                student_id: parts[studentIdIdx],
-                                name: parts[nameIdx],
-                                rfid_card: parts[rfidIdx] ? parts[rfidIdx].toLowerCase() : ''
-                            });
+            if (!isExcel && !isCSV) {
+                alert('❌ รองรับเฉพาะไฟล์ .csv, .xlsx และ .xls เท่านั้น');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                let csv = null;
+                let bestEncoding = 'utf-8';
+
+                // ถ้าเป็นไฟล์ Excel ให้แปลงเป็น CSV ก่อน
+                if (isExcel) {
+                    console.log('กำลังอ่านไฟล์ Excel...');
+                    csv = await readExcelFile(file);
+                    bestEncoding = 'excel';
+                } 
+                // ถ้าเป็น CSV ให้ตรวจจับ encoding อัตโนมัติ
+                else {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const encodings = [
+                        'utf-8',           // UTF-8 (มาตรฐาน)
+                        'windows-874',     // Windows Thai (TIS-620)
+                        'iso-8859-11',     // Thai (TIS-620)
+                        'windows-1252',    // Windows Latin
+                    ];
+
+                    let bestThaiCharCount = 0;
+
+                    // ลองแต่ละ encoding และเลือกที่มีอักขระไทยมากที่สุด
+                    for (const encoding of encodings) {
+                        try {
+                            const decoder = new TextDecoder(encoding);
+                            const text = decoder.decode(arrayBuffer);
+                            
+                            // นับจำนวนอักขระไทย (Unicode range: 0E00-0E7F)
+                            const thaiCharCount = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+                            
+                            // ตรวจสอบว่าไม่มีอักขระแปลกๆ (replacement characters)
+                            const hasReplacementChar = text.includes('\uFFFD');
+                            
+                            if (thaiCharCount > bestThaiCharCount && !hasReplacementChar) {
+                                bestThaiCharCount = thaiCharCount;
+                                csv = text;
+                                bestEncoding = encoding;
+                            }
+                            
+                            // ถ้าเจอ UTF-8 ที่มีภาษาไทย ใช้เลย
+                            if (encoding === 'utf-8' && thaiCharCount > 0 && !hasReplacementChar) {
+                                break;
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to decode with ${encoding}:`, err);
                         }
                     }
-
-                    if (students.length === 0) {
-                        alert('ไม่มีข้อมูลนักเรียนในไฟล์');
-                        return;
-                    }
-
-                    // ตรวจสอบว่าเลือกวิชาแล้ว
-                    if (!students[0].course_id) {
-                        alert('กรุณาตั้งค่าวิชาปัจจุบันหรือระบุ course_id ในไฟล์')
-                        return;
-                    }
-
-                    const summary = `พบ ${students.length} นักเรียน\n\nนักเรียนแรก:\n- รหัส: ${students[0].student_id}\n- ชื่อ: ${students[0].name}\n- RFID: ${students[0].rfid_card}\n\nต้องการนำเข้าข้อมูลนี้ใช่หรือไม่?`;
-                    
-                    if (!confirm(summary)) {
-                        return;
-                    }
-
-                    const response = await fetch('/api/students/bulk', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ students })
-                    });
-
-                    const result = await response.json();
-                    if (response.ok) {
-                        alert(`นำเข้าสำเร็จ: ${result.imported} นักเรียน\nข้อผิดพลาด: ${result.errors || 0}`);
-                        await loadStudents();
-                    } else {
-                        alert(result.error || 'เกิดข้อผิดพลาดในการนำเข้า');
-                    }
-                } catch (error) {
-                    alert('ไม่สามารถอ่านไฟล์ได้: ' + error.message);
                 }
-            };
-            reader.readAsText(file);
+
+                if (!csv) {
+                    alert('❌ ไม่สามารถอ่านไฟล์ได้\n\nโปรดตรวจสอบว่าไฟล์เป็น CSV หรือ Excel');
+                    event.target.value = '';
+                    return;
+                }
+
+                console.log(`ใช้ encoding: ${bestEncoding}`);
+
+                // ลบ BOM (Byte Order Mark) ถ้ามี
+                if (csv.charCodeAt(0) === 0xFEFF) {
+                    csv = csv.slice(1);
+                }
+                
+                const lines = csv.split('\n').filter(line => line.trim());
+                
+                if (lines.length < 1) {
+                    alert('❌ ไฟล์ว่างเปล่า');
+                    event.target.value = '';
+                    return;
+                }
+
+                const students = [];
+                
+                // ตรวจสอบว่าบรรทัดแรกเป็น header หรือไม่
+                const firstLine = lines[0].toLowerCase();
+                const hasHeader = firstLine.includes('student_id') || 
+                                 firstLine.includes('รหัส') || 
+                                 firstLine.includes('name') ||
+                                 firstLine.includes('ชื่อ') ||
+                                 firstLine.includes('เลขที่') ||
+                                 firstLine.includes('number') ||
+                                 firstLine.includes('rfid');
+                
+                const startIndex = hasHeader ? 1 : 0;
+
+                for (let i = startIndex; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const parts = line.split(',').map(p => p.trim());
+                    
+                    if (parts.length === 0 || !parts[0]) continue;
+
+                    let studentNumber = null;
+                    let studentId;
+                    let studentName;
+                    let rfidCard;
+
+                    // Format 1: เลขที่, รหัสนักเรียน, ชื่อ, RFID (4+ columns)
+                    if (parts.length >= 4) {
+                        const maybeNumber = parseInt(parts[0], 10);
+                        studentNumber = Number.isNaN(maybeNumber) ? null : maybeNumber;
+                        studentId = parts[1];
+                        studentName = parts[2];
+                        rfidCard = parts[3];
+                    }
+                    // Format 2: รหัสนักเรียน, ชื่อ, RFID (3 columns)
+                    else if (parts.length >= 3) {
+                        studentId = parts[0];
+                        studentName = parts[1];
+                        rfidCard = parts[2];
+                    }
+                    // Format 3: รหัส ชื่อ, RFID (2 columns)
+                    else if (parts.length === 2) {
+                        const firstCol = parts[0].split(/\s+/);
+                        if (firstCol.length >= 2) {
+                            studentId = firstCol[0];
+                            studentName = firstCol.slice(1).join(' ');
+                        } else {
+                            studentId = parts[0];
+                            studentName = parts[0];
+                        }
+                        rfidCard = parts[1];
+                    } else {
+                        continue;
+                    }
+
+                    // ตรวจสอบว่าข้อมูลครบและไม่ว่าง
+                    if (studentId && studentName && rfidCard) {
+                        students.push({
+                            course_id: activeCourseId,
+                            student_number: studentNumber,
+                            student_id: studentId.trim(),
+                            name: studentName.trim(),
+                            rfid_card: rfidCard.trim().toLowerCase()
+                        });
+                    }
+                }
+
+                if (students.length === 0) {
+                    alert('❌ ไม่พบข้อมูลนักเรียนที่ถูกต้องในไฟล์\n\n' +
+                          '📝 รูปแบบที่รองรับ:\n' +
+                          '• เลขที่,รหัสนักเรียน,ชื่อ-สกุล,RFID\n' +
+                          '• รหัสนักเรียน,ชื่อ-สกุล,RFID\n' +
+                          '• รหัส ชื่อ-สกุล,RFID\n\n' +
+                          '💡 ตัวอย่าง:\n' +
+                          '1,6301001,สมชาย ใจดี,9ef13a02\n' +
+                          '6301002,สมหญิง รักเรียน,a1b2c3d4');
+                    event.target.value = '';
+                    return;
+                }
+
+                const courseName = courses.find(c => c.id === activeCourseId)?.name || 'ไม่ทราบ';
+                const fileTypeDisplay = isExcel ? '📊 Excel' : `📄 CSV (${bestEncoding})`;
+                const summary = `พบ ${students.length} นักเรียนที่ถูกต้อง\n\n` +
+                              `📚 วิชา: ${courseName}\n` +
+                              `📁 ไฟล์: ${fileTypeDisplay}\n\n` +
+                              `👤 ตัวอย่างนักเรียนแรก:\n` +
+                              `   เลขที่: ${students[0].student_number ?? '-'}\n` +
+                              `   รหัส: ${students[0].student_id}\n` +
+                              `   ชื่อ: ${students[0].name}\n` +
+                              `   RFID: ${students[0].rfid_card}\n\n` +
+                              `ต้องการนำเข้าข้อมูลนี้ใช่หรือไม่?`;
+                
+                if (!confirm(summary)) {
+                    event.target.value = '';
+                    return;
+                }
+
+                const response = await fetch('/api/students/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ students })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    const successMsg = `✅ นำเข้าสำเร็จ: ${result.imported} นักเรียน`;
+                    const errorMsg = result.errors > 0 ? `\n⚠️ ข้อผิดพลาด/ซ้ำ: ${result.errors} รายการ` : '';
+                    alert(successMsg + errorMsg + '\n\n🔄 กำลังรีเฟรชรายการนักเรียน...');
+                    await loadStudents();
+                } else {
+                    alert('❌ ' + (result.error || 'เกิดข้อผิดพลาดในการนำเข้า'));
+                }
+            } catch (error) {
+                console.error('File upload error:', error);
+                alert('❌ ไม่สามารถอ่านไฟล์ได้\n\n' + error.message);
+            }
             
             // Reset input
             event.target.value = '';
@@ -914,8 +1185,9 @@
         checkAuth().then(isAuth => {
             if (isAuth) {
                 loadCourses();
-                loadStudents();
-                loadActiveCourse();
+                loadActiveCourse().then(() => {
+                    loadStudents();  // รอให้ loadActiveCourse() เสร็จ ก่อนโหลดนักเรียน
+                });
             }
         });
     </script>
