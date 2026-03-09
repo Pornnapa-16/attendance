@@ -81,22 +81,14 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log(`
-╔══════════════════════════════════════════════════════════╗
-║                                                          ║
-║      🎓  ระบบเช็คชื่อด้วย RFID - PostgreSQL             ║
-║                                                          ║
-║      Server running on: http://localhost:${PORT}         ║
-║      Environment: ${process.env.NODE_ENV || 'development'}                            ║
-║                                                          ║
-║      📁 Routes organized by feature:                     ║
-║         • Auth (Login, Register, Logout)                 ║
-║         • Password (Forgot/Reset)                        ║
-║         • Profile (View/Edit, Change Password)           ║
-║         • Courses (CRUD + Active Course)                 ║
-║         • Students (CRUD + Bulk Import)                  ║
-║         • Attendance (RFID Scan + Records)               ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║      🎓  ระบบเช็คชื่อด้วย RFID - PostgreSQL                      ║
+║                                                               ║
+║      Server running on: http://localhost:${PORT}              ║
+║      Environment: ${process.env.NODE_ENV || 'development'}    ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
     `);
 });
 
