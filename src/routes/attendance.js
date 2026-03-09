@@ -6,6 +6,32 @@ const router = express.Router();
 const { pool } = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
+const THAI_TIMEZONE = 'Asia/Bangkok';
+
+function getThaiNowParts() {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: THAI_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(new Date());
+
+    const map = {};
+    for (const part of parts) {
+        if (part.type !== 'literal') {
+            map[part.type] = part.value;
+        }
+    }
+
+    return {
+        date: `${map.year}-${map.month}-${map.day}`,
+        minutes: (parseInt(map.hour, 10) * 60) + parseInt(map.minute, 10)
+    };
+}
+
 // สแกน RFID และบันทึกการเข้าเรียน (Public API สำหรับ ESP32)
 router.post('/attendance/scan', async (req, res) => {
     try {
@@ -69,8 +95,8 @@ router.post('/attendance/scan', async (req, res) => {
             }
 
             // คำนวณสถานะ (มา/สาย/ขาด)
-            const now = new Date();
-            const currentTime = now.getHours() * 60 + now.getMinutes();
+            const thaiNow = getThaiNowParts();
+            const currentTime = thaiNow.minutes;
             const classTimeParts = course.start_time.split(':');
             const classTimeMinutes = parseInt(classTimeParts[0]) * 60 + parseInt(classTimeParts[1]);
 
@@ -86,7 +112,7 @@ router.post('/attendance/scan', async (req, res) => {
             }
 
             // ตรวจสอบว่ามีการเช็คชื่อซ้ำไหม (ในวันเดียวกันของวิชาเดียวกัน)
-            const today = new Date().toISOString().split('T')[0];
+            const today = thaiNow.date;
             const dupResult = await pool.query(
                 `SELECT a.*, s.student_id, s.name 
                  FROM attendance a
