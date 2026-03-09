@@ -46,17 +46,6 @@ async function initDatabase() {
             )
         `);
 
-        // รองรับฐานข้อมูลเดิมที่ยังไม่มีคอลัมน์ใน teachers
-        await pool.query(`
-            ALTER TABLE teachers
-            ADD COLUMN IF NOT EXISTS name VARCHAR(255)
-        `);
-
-        await pool.query(`
-            ALTER TABLE teachers
-            ADD COLUMN IF NOT EXISTS email VARCHAR(255)
-        `);
-
         // 2. Create courses table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS courses (
@@ -131,10 +120,6 @@ async function initDatabase() {
         return true;
     } catch (err) {
         console.error('❌ Error creating tables:', err.message);
-        if (/Tenant or user not found/i.test(err.message)) {
-            console.error('💡 DATABASE_URL ของ Supabase ไม่ถูกต้อง (project ref / username / host / port)');
-            console.error('   ตัวอย่างที่ถูกต้อง: postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:6543/postgres');
-        }
         throw err;
     }
 }
