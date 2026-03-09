@@ -99,6 +99,9 @@ router.post('/register', async (req, res) => {
         if (err.code === '23505') { // UNIQUE constraint
             return res.status(400).json({ error: 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว' });
         }
+        if (err.code === '42703') {
+            return res.status(500).json({ error: 'โครงสร้างฐานข้อมูลยังไม่อัปเดต กรุณาลองใหม่อีกครั้งใน 1 นาที' });
+        }
         res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
     }
 });

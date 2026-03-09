@@ -46,6 +46,17 @@ async function initDatabase() {
             )
         `);
 
+        // รองรับฐานข้อมูลเดิมที่ยังไม่มีคอลัมน์ใน teachers
+        await pool.query(`
+            ALTER TABLE teachers
+            ADD COLUMN IF NOT EXISTS name VARCHAR(255)
+        `);
+
+        await pool.query(`
+            ALTER TABLE teachers
+            ADD COLUMN IF NOT EXISTS email VARCHAR(255)
+        `);
+
         // 2. Create courses table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS courses (

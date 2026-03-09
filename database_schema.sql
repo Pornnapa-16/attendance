@@ -13,6 +13,13 @@ CREATE TABLE IF NOT EXISTS teachers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Migration for existing databases
+ALTER TABLE teachers
+ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+
+ALTER TABLE teachers
+ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+
 -- 2. Courses Table
 CREATE TABLE IF NOT EXISTS courses (
     id SERIAL PRIMARY KEY,
