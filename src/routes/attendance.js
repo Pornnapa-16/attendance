@@ -54,11 +54,18 @@ router.post('/attendance/scan', async (req, res) => {
                 [targetCourseId, student.id]
             );
 
+            // ถ้าไม่มี enrollment ให้ auto-enroll
             if (enrollResult.rows.length === 0) {
-                return res.status(400).json({ 
-                    error: 'ไม่พบรหัสนักเรียนในวิชานี้',
-                    message: `${student.name} (${student.student_id}) ไม่ได้ลงทะเบียนวิชานี้`
-                });
+                try {
+                    await pool.query(
+                        'INSERT INTO course_enrollments (course_id, student_id) VALUES ($1, $2)',
+                        [targetCourseId, student.id]
+                    );
+                    console.log(`✅ Auto-enrolled: ${student.name} (${student.student_id}) in course ${targetCourseId}`);
+                } catch (enrollErr) {
+                    console.warn('⚠️ Auto-enroll warning:', enrollErr.message);
+                    // ไม่ส่ง error เพราะอาจจะอยู่แล้ว
+                }
             }
 
             // คำนวณสถานะ (มา/สาย/ขาด)
@@ -156,8 +163,8 @@ router.post('/attendance/scan', async (req, res) => {
     }
 });
 
-// ดึงรายการเช็คชื่อของวิชา
-router.get('/attendance/:courseId', requireAuth, async (req, res) => {
+// ดึงรายการเช็คชื่อของวิชา (Public API)
+router.get('/attendance/:courseId', async (req, res) => {
     try {
         const { date } = req.query;
         const courseId = req.params.courseId;
