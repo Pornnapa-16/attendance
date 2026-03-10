@@ -235,7 +235,7 @@ router.get('/attendance/:courseId/students', async (req, res) => {
                 s.student_id,
                 s.name,
                 s.rfid_card,
-                a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok' as scan_time,
+                TO_CHAR(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok', 'HH24:MI:SS') as scan_time,
                 a.status
             FROM course_enrollments ce
             JOIN students s ON ce.student_id = s.id
