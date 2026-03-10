@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
+const ExcelJS = require('exceljs');
 
 const THAI_TIMEZONE = 'Asia/Bangkok';
 
@@ -221,6 +222,38 @@ router.get('/attendance/:courseId', async (req, res) => {
 });
 
 // ดึงสถิติการเข้าเรียน
+// ดึงรายชื่อนักเรียนทั้งหมดพร้อมสถานะการเช็คชื่อวันนี้
+router.get('/attendance/:courseId/students', async (req, res) => {
+    try {
+        const { date } = req.query;
+        const courseId = req.params.courseId;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+
+        const result = await pool.query(
+            `SELECT 
+                s.id,
+                s.student_id,
+                s.name,
+                s.rfid_card,
+                a.scan_time,
+                a.status
+            FROM course_enrollments ce
+            JOIN students s ON ce.student_id = s.id
+            LEFT JOIN attendance a ON s.id = a.student_id 
+                AND a.course_id = ce.course_id 
+                AND DATE(a.scan_time) = $2
+            WHERE ce.course_id = $1
+            ORDER BY s.student_id`,
+            [courseId, targetDate]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Get students with attendance error:', err);
+        res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลนักเรียนได้' });
+    }
+});
+
 router.get('/attendance/:courseId/stats', requireAuth, async (req, res) => {
     try {
         const courseId = req.params.courseId;
@@ -246,6 +279,144 @@ router.get('/attendance/:courseId/stats', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('Get stats error:', err);
         res.status(500).json({ error: 'ไม่สามารถดึงสถิติได้' });
+    }
+});
+
+// ส่งออกข้อมูลการเช็กชื่อเป็น Excel
+router.get('/attendance/:courseId/export', async (req, res) => {
+    try {
+        const { date } = req.query;
+        const courseId = req.params.courseId;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+
+        // ดึงข้อมูลวิชา
+        const courseResult = await pool.query(
+            'SELECT * FROM courses WHERE id = $1',
+            [courseId]
+        );
+
+        if (courseResult.rows.length === 0) {
+            return res.status(404).json({ error: 'ไม่พบข้อมูลวิชา' });
+        }
+
+        const course = courseResult.rows[0];
+
+        // ดึงข้อมูลนักเรียนและการเช็คชื่อ
+        const attendanceResult = await pool.query(
+            `SELECT 
+                s.id,
+                s.student_id,
+                s.name,
+                s.rfid_card,
+                a.scan_time,
+                a.status
+            FROM course_enrollments ce
+            JOIN students s ON ce.student_id = s.id
+            LEFT JOIN attendance a ON s.id = a.student_id 
+                AND a.course_id = ce.course_id 
+                AND DATE(a.scan_time) = $2
+            WHERE ce.course_id = $1
+            ORDER BY s.student_id`,
+            [courseId, targetDate]
+        );
+
+        // สร้าง Excel workbook
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('การเช็คชื่อ');
+
+        // ตั้งค่าคอลัมน์
+        worksheet.columns = [
+            { header: 'รหัสนักเรียน', key: 'student_id', width: 15 },
+            { header: 'ชื่อ-สกุล', key: 'name', width: 30 },
+            { header: 'เวลาเช็คชื่อ', key: 'scan_time', width: 20 },
+            { header: 'สถานะ', key: 'status', width: 15 }
+        ];
+
+        // จัดรูปแบบหัวตาราง
+        worksheet.getRow(1).font = { bold: true, size: 12 };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE0E0E0' }
+        };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        // เพิ่มข้อมูล
+        attendanceResult.rows.forEach(record => {
+            const row = worksheet.addRow({
+                student_id: record.student_id,
+                name: record.name,
+                scan_time: record.scan_time ? 
+                    new Date(record.scan_time).toLocaleTimeString('th-TH', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    }) : '-',
+                status: record.status || ''
+            });
+
+            // ใส่สีตามสถานะ
+            if (record.status) {
+                const statusCell = row.getCell(4);
+                if (record.status === 'มา') {
+                    statusCell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFD4EDDA' }
+                    };
+                    statusCell.font = { color: { argb: 'FF155724' } };
+                } else if (record.status === 'สาย' || record.status === 'สายมาก') {
+                    statusCell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFFF3CD' }
+                    };
+                    statusCell.font = { color: { argb: 'FF856404' } };
+                } else if (record.status === 'ขาด') {
+                    statusCell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF8D7DA' }
+                    };
+                    statusCell.font = { color: { argb: 'FF721C24' } };
+                }
+            }
+        });
+
+        // เพิ่มสรุปด้านบน
+        worksheet.insertRow(1, ['รายงานการเช็คชื่อ']);
+        worksheet.insertRow(2, [`วิชา: ${course.name} (${course.course_code})`]);
+        worksheet.insertRow(3, [`วันที่: ${new Date(targetDate).toLocaleDateString('th-TH', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        })}`]);
+        worksheet.insertRow(4, ['']);
+
+        // จัดรูปแบบหัวเรื่อง
+        worksheet.getRow(1).font = { bold: true, size: 16 };
+        worksheet.getRow(2).font = { size: 12 };
+        worksheet.getRow(3).font = { size: 12 };
+        worksheet.mergeCells('A1:D1');
+        worksheet.mergeCells('A2:D2');
+        worksheet.mergeCells('A3:D3');
+
+        // สร้างไฟล์ Excel
+        const dateStr = targetDate.replace(/-/g, '');
+        const filename = `การเช็คชื่อ_${course.course_code}_${dateStr}.xlsx`;
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (err) {
+        console.error('Export Excel error:', err);
+        res.status(500).json({ error: 'ไม่สามารถส่งออกไฟล์ได้' });
     }
 });
 

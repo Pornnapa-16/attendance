@@ -257,6 +257,135 @@
             color: #666;
             font-size: 14px;
         }
+
+        .date-filter {
+            background: white;
+            padding: 20px 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .date-filter h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .date-input {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .date-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-date {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-date:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-date.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-export {
+            padding: 10px 20px;
+            border: 2px solid #28a745;
+            background: #28a745;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-export:hover {
+            background: #218838;
+            border-color: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+        }
+
+        .auto-refresh-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #667eea;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
     </style>
 </head>
 <body>
@@ -278,10 +407,30 @@
             <p>หน้านี้จะแสดงผลเช็คชื่อจากการสแกนที่บอร์ด ESP32 เท่านั้น และอัปเดตอัตโนมัติทุก 5 วินาที</p>
         </div>
 
+        <div class="date-filter">
+            <h3>📅 เลือกวันที่</h3>
+            <div class="filter-controls">
+                <input type="date" id="dateInput" class="date-input">
+                <button class="btn-date" id="btnToday">วันนี้</button>
+                <button class="btn-date" id="btnYesterday">เมื่อวาน</button>
+                <button class="btn-date" id="btnWeek">7 วันที่แล้ว</button>
+                <button class="btn-export" id="btnExport">
+                    📊 ส่งออก Excel
+                </button>
+                <div class="auto-refresh-toggle">
+                    <span>อัปเดตอัตโนมัติ</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoRefreshToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <div class="attendance-section">
             <div class="section-header">
-                <h3>📋 รายการเช็คชื่อวันนี้</h3>
-                <div class="auto-refresh">🔄 อัปเดตอัตโนมัติทุก 5 วินาที</div>
+                <h3>📋 รายการเช็คชื่อ <span id="displayDate">วันนี้</span></h3>
+                <div class="auto-refresh" id="refreshStatus">🔄 อัปเดตอัตโนมัติทุก 5 วินาที</div>
             </div>
 
             <div class="stats" id="stats">
@@ -320,6 +469,8 @@
     <script>
         let courseId = null;
         let course = null;
+        let autoRefreshInterval = null;
+        let selectedDate = new Date().toISOString().split('T')[0];
 
         // ดึง courseId จาก URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -329,6 +480,10 @@
             alert('ไม่พบข้อมูลวิชา');
             window.location.href = '/dashboard';
         }
+
+        // ตั้งค่า date input เป็นวันนี้
+        document.getElementById('dateInput').value = selectedDate;
+        document.getElementById('dateInput').max = selectedDate;
 
         // โหลดข้อมูลวิชา
         async function loadCourse() {
@@ -349,16 +504,33 @@
         }
 
         // โหลดรายการเช็คชื่อ
-        async function loadAttendance() {
+        async function loadAttendance(date = selectedDate) {
             try {
-                const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`/api/attendance/${courseId}?date=${today}`);
+                const response = await fetch(`/api/attendance/${courseId}/students?date=${date}`);
                 const records = await response.json();
 
                 updateStats(records);
                 renderAttendanceTable(records);
+                updateDisplayDate(date);
             } catch (error) {
                 console.error('Error loading attendance:', error);
+            }
+        }
+
+        // อัปเดตการแสดงวันที่
+        function updateDisplayDate(date) {
+            const today = new Date().toISOString().split('T')[0];
+            const selectedDateObj = new Date(date + 'T00:00:00');
+            
+            if (date === today) {
+                document.getElementById('displayDate').textContent = 'วันนี้';
+            } else {
+                const thaiDate = selectedDateObj.toLocaleDateString('th-TH', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                document.getElementById('displayDate').textContent = thaiDate;
             }
         }
 
@@ -378,33 +550,124 @@
             const tbody = document.getElementById('attendanceBody');
 
             if (records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">ยังไม่มีการเช็คชื่อ</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">ไม่มีนักเรียนในวิชานี้</td></tr>';
                 return;
             }
 
             tbody.innerHTML = records.map(record => {
-                const time = new Date(record.scan_time).toLocaleTimeString('th-TH');
-                const statusClass = record.status === 'มา' ? 'present' : 
-                                   record.status === 'สาย' || record.status === 'สายมาก' ? 'late' : 
-                                   'absent';
+                let timeDisplay = '-';
+                let statusDisplay = '';
+                
+                if (record.scan_time) {
+                    timeDisplay = new Date(record.scan_time).toLocaleTimeString('th-TH');
+                    const statusClass = record.status === 'มา' ? 'present' : 
+                                       record.status === 'สาย' || record.status === 'สายมาก' ? 'late' : 
+                                       'absent';
+                    statusDisplay = `<span class="status-badge ${statusClass}">${record.status}</span>`;
+                }
                 
                 return `
                     <tr>
                         <td>${record.student_id}</td>
                         <td>${record.name}</td>
-                        <td>${time}</td>
-                        <td><span class="status-badge ${statusClass}">${record.status}</span></td>
+                        <td>${timeDisplay}</td>
+                        <td>${statusDisplay}</td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        // จัดการการเลือกวันที่
+        document.getElementById('dateInput').addEventListener('change', (e) => {
+            selectedDate = e.target.value;
+            loadAttendance(selectedDate);
+            checkAutoRefresh();
+        });
+
+        // ปุ่มวันนี้
+        document.getElementById('btnToday').addEventListener('click', () => {
+            const today = new Date().toISOString().split('T')[0];
+            selectedDate = today;
+            document.getElementById('dateInput').value = today;
+            loadAttendance(selectedDate);
+            checkAutoRefresh();
+        });
+
+        // ปุ่มเมื่อวาน
+        document.getElementById('btnYesterday').addEventListener('click', () => {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            selectedDate = yesterday.toISOString().split('T')[0];
+            document.getElementById('dateInput').value = selectedDate;
+            loadAttendance(selectedDate);
+            checkAutoRefresh();
+        });
+
+        // ปุ่ม 7 วันที่แล้ว
+        document.getElementById('btnWeek').addEventListener('click', () => {
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            selectedDate = weekAgo.toISOString().split('T')[0];
+            document.getElementById('dateInput').value = selectedDate;
+            loadAttendance(selectedDate);
+            checkAutoRefresh();
+        });
+
+        // ปุ่มส่งออก Excel
+        document.getElementById('btnExport').addEventListener('click', () => {
+            const exportUrl = `/api/attendance/${courseId}/export?date=${selectedDate}`;
+            window.open(exportUrl, '_blank');
+        });
+
+        // Toggle auto-refresh
+        document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+
+        // เริ่ม auto-refresh
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const today = new Date().toISOString().split('T')[0];
+            if (selectedDate === today) {
+                autoRefreshInterval = setInterval(() => loadAttendance(selectedDate), 5000);
+                document.getElementById('refreshStatus').textContent = '🔄 อัปเดตอัตโนมัติทุก 5 วินาที';
+            }
+        }
+
+        // หยุด auto-refresh
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                document.getElementById('refreshStatus').textContent = '⏸️ หยุดการอัปเดตอัตโนมัติ';
+            }
+        }
+
+        // ตรวจสอบว่าควร auto-refresh หรือไม่
+        function checkAutoRefresh() {
+            const today = new Date().toISOString().split('T')[0];
+            const toggle = document.getElementById('autoRefreshToggle');
+            
+            if (selectedDate !== today) {
+                if (toggle.checked) {
+                    toggle.checked = false;
+                    stopAutoRefresh();
+                }
+            } else if (toggle.checked) {
+                startAutoRefresh();
+            }
         }
 
         // โหลดข้อมูลเริ่มต้น
         loadCourse();
         loadAttendance();
 
-        // อัปเดตอัตโนมัติทุก 5 วินาที
-        setInterval(loadAttendance, 5000);
+        // เริ่ม auto-refresh
+        startAutoRefresh();
     </script>
 </body>
 </html>
