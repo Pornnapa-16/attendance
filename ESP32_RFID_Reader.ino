@@ -77,6 +77,9 @@ const unsigned long DUP_MS = 1200;  // รอ 1.2 วินาที
 int currentCourseId = DEFAULT_COURSE_ID;
 unsigned long lastCourseSyncMs = 0;
 const unsigned long COURSE_SYNC_INTERVAL_MS = 10000;
+unsigned long lastWifiReconnectMs = 0;
+const unsigned long WIFI_RECONNECT_INTERVAL_MS = 8000;
+const int HTTP_TIMEOUT_MS = 8000;
 
 // ==================== ฟังก์ชัน: อ่าน RFID UID ====================
 String readUID() {
@@ -91,7 +94,13 @@ String readUID() {
 
 // ==================== ฟังก์ชัน: เชื่อมต่อ WiFi ====================
 void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   Serial.print("🔌 กำลังเชื่อมต่อ WiFi: ");
@@ -112,9 +121,43 @@ void connectWiFi() {
   }
 }
 
+// ==================== ฟังก์ชัน: รักษาการเชื่อมต่อ WiFi ====================
+bool ensureWiFiConnected() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
+
+  unsigned long nowMs = millis();
+  if (nowMs - lastWifiReconnectMs < WIFI_RECONNECT_INTERVAL_MS) {
+    return false;
+  }
+
+  lastWifiReconnectMs = nowMs;
+  Serial.println("⚠️ WiFi หลุด กำลัง reconnect...");
+
+  WiFi.disconnect();
+  WiFi.reconnect();
+
+  unsigned long startMs = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - startMs) < 5000) {
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("✅ WiFi กลับมาแล้ว IP: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+
+  Serial.println("❌ reconnect WiFi ยังไม่สำเร็จ");
+  return false;
+}
+
 // ==================== ฟังก์ชัน: ดึงวิชาปัจจุบันจากเว็บ ====================
 void syncActiveCourse() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (!ensureWiFiConnected()) return;
 
   HTTPClient http;
   String activeCourseUrl = String(ACTIVE_COURSE_URL);
@@ -133,6 +176,9 @@ void syncActiveCourse() {
     }
   }
 
+  http.setConnectTimeout(HTTP_TIMEOUT_MS);
+  http.setTimeout(HTTP_TIMEOUT_MS);
+
   int code = http.GET();
   String response = http.getString();
   http.end();
@@ -140,6 +186,10 @@ void syncActiveCourse() {
   if (code != 200) {
     Serial.print("⚠️ ยังไม่พบวิชาปัจจุบันจากเว็บ code=");
     Serial.println(code);
+    if (code < 0) {
+      Serial.print("   สาเหตุ: ");
+      Serial.println(http.errorToString(code));
+    }
     return;
   }
 
@@ -164,32 +214,15 @@ void syncActiveCourse() {
 
 // ==================== ฟังก์ชัน: ส่งข้อมูลการเช็คชื่อไปยัง Server ====================
 SendResult postAttendance(const String& rfidUID) {
-  if (WiFi.status() != WL_CONNECTED) {
+  if (!ensureWiFiConnected()) {
     Serial.println("❌ WiFi ไม่ได้เชื่อมต่อ");
     return SEND_FAIL;
   }
 
-  HTTPClient http;
-  String serverUrl = String(SERVER_URL);
-  bool isHttps = serverUrl.startsWith("https://");
-  
-  if (isHttps) {
-    secureWifiClient.setInsecure();  // ยอมรับ TLS certificate เพื่อความง่ายในการใช้งาน
-    if (!http.begin(secureWifiClient, serverUrl)) {
-      Serial.println("❌ ไม่สามารถเชื่อมต่อ Server ได้");
-      return SEND_FAIL;
-    }
-  } else {
-    if (!http.begin(wifiClient, serverUrl)) {
-      Serial.println("❌ ไม่สามารถเชื่อมต่อ Server ได้");
-      return SEND_FAIL;
-    }
-  }
-
-  http.addHeader("Content-Type", "application/json");
-
   // สร้าง JSON Payload (ไม่ใช้ ArduinoJson)
   String payload = "{\"rfid\":\"" + rfidUID + "\",\"courseId\":" + String(currentCourseId) + "}";
+  String serverUrl = String(SERVER_URL);
+  bool isHttps = serverUrl.startsWith("https://");
 
   Serial.println("📤 กำลังส่งข้อมูล...");
   Serial.print("   RFID: ");
@@ -197,9 +230,48 @@ SendResult postAttendance(const String& rfidUID) {
   Serial.print(" | Course ID: ");
   Serial.println(currentCourseId);
 
-  int code = http.POST(payload);
-  String response = http.getString();
-  http.end();
+  int code = -1;
+  String response = "";
+
+  for (int attempt = 1; attempt <= 2; attempt++) {
+    if (!ensureWiFiConnected()) {
+      continue;
+    }
+
+    HTTPClient http;
+    bool beginOk = false;
+
+    if (isHttps) {
+      secureWifiClient.setInsecure();
+      beginOk = http.begin(secureWifiClient, serverUrl);
+    } else {
+      beginOk = http.begin(wifiClient, serverUrl);
+    }
+
+    if (!beginOk) {
+      Serial.println("❌ ไม่สามารถเชื่อมต่อ Server ได้ (begin fail)");
+      delay(300);
+      continue;
+    }
+
+    http.setConnectTimeout(HTTP_TIMEOUT_MS);
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.addHeader("Content-Type", "application/json");
+
+    code = http.POST(payload);
+    response = http.getString();
+    http.end();
+
+    if (code > 0) {
+      break;
+    }
+
+    Serial.print("⚠️ ส่งไม่สำเร็จ attempt ");
+    Serial.print(attempt);
+    Serial.print(" code=");
+    Serial.println(code);
+    delay(500);
+  }
 
   Serial.print("📥 Response Code: ");
   Serial.println(code);
@@ -304,9 +376,9 @@ void setup() {
 // ==================== Main Loop ====================
 void loop() {
   // ตรวจสอบการเชื่อมต่อ WiFi
-  if (WiFi.status() != WL_CONNECTED) {
+  if (!ensureWiFiConnected()) {
     stateWait();
-    delay(1000);
+    delay(250);
     return;
   }
 
