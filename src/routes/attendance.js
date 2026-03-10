@@ -235,13 +235,13 @@ router.get('/attendance/:courseId/students', async (req, res) => {
                 s.student_id,
                 s.name,
                 s.rfid_card,
-                a.scan_time,
+                a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok' as scan_time,
                 a.status
             FROM course_enrollments ce
             JOIN students s ON ce.student_id = s.id
             LEFT JOIN attendance a ON s.id = a.student_id 
                 AND a.course_id = ce.course_id 
-                AND DATE(a.scan_time) = $2
+                AND DATE(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok') = $2
             WHERE ce.course_id = $1
             ORDER BY s.student_id`,
             [courseId, targetDate]
@@ -308,13 +308,13 @@ router.get('/attendance/:courseId/export', async (req, res) => {
                 s.student_id,
                 s.name,
                 s.rfid_card,
-                a.scan_time,
+                a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok' as scan_time,
                 a.status
             FROM course_enrollments ce
             JOIN students s ON ce.student_id = s.id
             LEFT JOIN attendance a ON s.id = a.student_id 
                 AND a.course_id = ce.course_id 
-                AND DATE(a.scan_time) = $2
+                AND DATE(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok') = $2
             WHERE ce.course_id = $1
             ORDER BY s.student_id`,
             [courseId, targetDate]
@@ -346,14 +346,10 @@ router.get('/attendance/:courseId/export', async (req, res) => {
             let timeDisplay = '-';
             if (record.scan_time) {
                 const dateObj = new Date(record.scan_time);
-                const thaiTime = new Intl.DateTimeFormat('th-TH', {
-                    timeZone: 'Asia/Bangkok',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                }).format(dateObj);
-                timeDisplay = thaiTime;
+                const hours = String(dateObj.getHours()).padStart(2, '0');
+                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+                timeDisplay = `${hours}:${minutes}:${seconds}`;
             }
 
             const row = worksheet.addRow({
