@@ -237,12 +237,11 @@ router.get('/attendance/:courseId/students', async (req, res) => {
                 s.rfid_card,
                 TO_CHAR(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok', 'HH24:MI:SS') as scan_time,
                 a.status
-            FROM course_enrollments ce
-            JOIN students s ON ce.student_id = s.id
+            FROM students s
             LEFT JOIN attendance a ON s.id = a.student_id 
-                AND a.course_id = ce.course_id 
+                AND a.course_id = $1
                 AND DATE(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok') = $2
-            WHERE ce.course_id = $1
+            WHERE s.course_id = $1
             ORDER BY s.student_id`,
             [courseId, targetDate]
         );
@@ -308,14 +307,13 @@ router.get('/attendance/:courseId/export', async (req, res) => {
                 s.student_id,
                 s.name,
                 s.rfid_card,
-                a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok' as scan_time,
+                TO_CHAR(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok', 'HH24:MI:SS') as scan_time,
                 a.status
-            FROM course_enrollments ce
-            JOIN students s ON ce.student_id = s.id
+            FROM students s
             LEFT JOIN attendance a ON s.id = a.student_id 
-                AND a.course_id = ce.course_id 
+                AND a.course_id = $1
                 AND DATE(a.scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok') = $2
-            WHERE ce.course_id = $1
+            WHERE s.course_id = $1
             ORDER BY s.student_id`,
             [courseId, targetDate]
         );
@@ -345,11 +343,8 @@ router.get('/attendance/:courseId/export', async (req, res) => {
         attendanceResult.rows.forEach(record => {
             let timeDisplay = '-';
             if (record.scan_time) {
-                const dateObj = new Date(record.scan_time);
-                const hours = String(dateObj.getHours()).padStart(2, '0');
-                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-                const seconds = String(dateObj.getSeconds()).padStart(2, '0');
-                timeDisplay = `${hours}:${minutes}:${seconds}`;
+                // scan_time ส่งมาจาก SQL เป็นรูปแบบ HH:MM:SS เวลาไทยแล้ว
+                timeDisplay = record.scan_time;
             }
 
             const row = worksheet.addRow({
