@@ -559,7 +559,14 @@
                 let statusDisplay = '';
                 
                 if (record.scan_time) {
-                    timeDisplay = new Date(record.scan_time).toLocaleTimeString('th-TH');
+                    const dateObj = new Date(record.scan_time);
+                    timeDisplay = new Intl.DateTimeFormat('th-TH', {
+                        timeZone: 'Asia/Bangkok',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    }).format(dateObj);
                     const statusClass = record.status === 'มา' ? 'present' : 
                                        record.status === 'สาย' || record.status === 'สายมาก' ? 'late' : 
                                        'absent';

@@ -343,15 +343,23 @@ router.get('/attendance/:courseId/export', async (req, res) => {
 
         // เพิ่มข้อมูล
         attendanceResult.rows.forEach(record => {
+            let timeDisplay = '-';
+            if (record.scan_time) {
+                const dateObj = new Date(record.scan_time);
+                const thaiTime = new Intl.DateTimeFormat('th-TH', {
+                    timeZone: 'Asia/Bangkok',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).format(dateObj);
+                timeDisplay = thaiTime;
+            }
+
             const row = worksheet.addRow({
                 student_id: record.student_id,
                 name: record.name,
-                scan_time: record.scan_time ? 
-                    new Date(record.scan_time).toLocaleTimeString('th-TH', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    }) : '-',
+                scan_time: timeDisplay,
                 status: record.status || ''
             });
 
