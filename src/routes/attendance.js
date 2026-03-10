@@ -45,13 +45,26 @@ router.post('/attendance/scan', async (req, res) => {
         const handleScanForCourse = async (targetCourseId) => {
             const normalizedRfid = String(rfid).trim().toLowerCase();
 
-            // ค้นหานักเรียนจาก RFID
+            // ค้นหานักเรียนจาก RFID ภายในวิชาที่กำลังเช็คชื่อเท่านั้น
             const studentResult = await pool.query(
-                'SELECT * FROM students WHERE LOWER(rfid_card) = $1',
-                [normalizedRfid]
+                'SELECT * FROM students WHERE LOWER(rfid_card) = $1 AND course_id = $2',
+                [normalizedRfid, targetCourseId]
             );
 
             if (studentResult.rows.length === 0) {
+                // เช็คเพิ่มเติมเพื่อให้ข้อความชัดเจนว่าเจอการ์ดแต่เป็นคนละวิชา
+                const existingRfid = await pool.query(
+                    'SELECT student_id, name, course_id FROM students WHERE LOWER(rfid_card) = $1 LIMIT 1',
+                    [normalizedRfid]
+                );
+
+                if (existingRfid.rows.length > 0) {
+                    return res.status(404).json({
+                        error: 'ไม่พบรหัสนักเรียนในวิชานี้',
+                        message: `การ์ดนี้ลงทะเบียนไว้กับวิชาอื่น (course_id=${existingRfid.rows[0].course_id})`,
+                    });
+                }
+
                 return res.status(404).json({ 
                     error: 'ไม่พบรหัสนักเรียน',
                     message: 'ไม่พบข้อมูลนักเรียน กรุณาลงทะเบียน RFID'
@@ -75,25 +88,7 @@ router.post('/attendance/scan', async (req, res) => {
 
             const course = courseResult.rows[0];
 
-            // ตรวจสอบว่านักเรียนลงทะเบียนวิชานี้หรือไม่
-            const enrollResult = await pool.query(
-                'SELECT * FROM course_enrollments WHERE course_id = $1 AND student_id = $2',
-                [targetCourseId, student.id]
-            );
-
-            // ถ้าไม่มี enrollment ให้ auto-enroll
-            if (enrollResult.rows.length === 0) {
-                try {
-                    await pool.query(
-                        'INSERT INTO course_enrollments (course_id, student_id) VALUES ($1, $2)',
-                        [targetCourseId, student.id]
-                    );
-                    console.log(`✅ Auto-enrolled: ${student.name} (${student.student_id}) in course ${targetCourseId}`);
-                } catch (enrollErr) {
-                    console.warn('⚠️ Auto-enroll warning:', enrollErr.message);
-                    // ไม่ส่ง error เพราะอาจจะอยู่แล้ว
-                }
-            }
+            // ใช้ students.course_id เป็นแหล่งข้อมูลหลัก จึงไม่ต้อง auto-enroll เพิ่ม
 
             // คำนวณสถานะ (มา/สาย/ขาด)
             const thaiNow = getThaiNowParts();
